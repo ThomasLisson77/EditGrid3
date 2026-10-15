@@ -1,0 +1,241 @@
+import { useState } from 'react'
+import records from '../data.json' // R-ST-24-0140
+
+const columns = [
+  { key: 'orb_scenarioid', label: 'Scenario No', display: 'name' },
+  { key: 'S.tkct_scenariono', label: 'Scenario Name', type: 'text' },
+  { key: 'orb_requestpositionid', label: 'Position No', display: 'name' },
+  { key: 'RP.orb_name', label: 'Position Name', type: 'text' },
+  //{ key: 'orb_year', label: 'Year' },
+  { key: 'tkct_incotermcode', label: 'Incoterm Code', type: 'select'},
+  { key: 'tkct_incotermlocation', label: 'Incoterm Location', type: 'text', isEditable : true },
+  { key: 'orb_mostlikelyscenario', label: 'Most Likely Scenario', type: 'checkbox', isEditable : true },
+  { key: 'tkct_quotecurrencyid', label: 'Quote Currency', type: 'select', display: 'name' },
+  { key: 'tkct_calculationcurrencyid', label: 'Calculation Currency', type: 'select', display: 'name' },
+  //{ key: 'orb_quantity', label: 'Quantity', type: 'number', isEditable : true },
+  { key: 'RP.orb_customeritemno', label: 'Customer Item No'},
+  { key: 'RP.tkatcore_tkmaterialno', label: 'TK Material No'},
+  { key: 'RP.tkatcore_sopcustomer', label: 'SOP Customer', type: 'date', isEditable : true },
+  { key: 'RP.tkatcore_eopcustomer', label: 'EOP Customer', type: 'date', isEditable : true },
+  { key: 'createdon', label: 'Created On', type: 'number' }
+];
+
+const incotermCodes = {
+  463080000 : 'EXW',
+  463080001 : 'CFR', 
+  463080002 : 'CIF', 
+  463080003 : 'CIP', 
+  463080004 : 'CPT', 
+  463080005 : 'DAF', 
+  463080006 : 'DAP', 
+  463080007 : 'DDP', 
+  463080008 : 'FCA', 
+  463080009 : 'FAS', 
+  463080010 : 'FOB' 
+}
+
+function App() {
+
+  // States
+  const [query, setQuery] = useState('')
+  const [onlyMostLikely, setOnlyMostLikely] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [drafts, setDrafts] = useState({})
+
+  const normalizedQuery = query.trim().toLowerCase()
+  let filteredRecords = records.filter((record) => {
+    if (!normalizedQuery){
+      return true;
+    }
+    const searchable = [
+      record.orb_scenarioid?.name,
+      record.orb_requestpositionid?.name,
+      record['S.tkct_scenariono'],
+      record['RP.orb_name'],
+      record.tkct_incotermlocation,
+      record["RP.orb_customeritemno"],
+      record["RP.tkatcore_tkmaterialno"]
+    ].join(' ').toLowerCase()
+    const matchesQuery = searchable.includes(normalizedQuery)
+    return matchesQuery && (!onlyMostLikely || record.orb_mostlikelyscenario)
+  })
+
+  // Add year columns
+  const yearColumns = [
+    ...new Set(
+      filteredRecords.map(rps => rps.orb_year)
+    )
+  ]
+    .sort()
+    .map(year => ({
+      key: year, 
+      label: year, 
+      type: 'number'
+    }))
+  if (
+    yearColumns && 
+    yearColumns.length && 
+    !columns.find(col => col.key == yearColumns[0].label)){
+    columns.splice(-1, 0, ...yearColumns);
+  }
+
+  // Shape data for the view
+  const rows = [];
+  const record0 = filteredRecords?.[0] ?? null;
+  let rowId = null, lastRowId = null;
+  let recordI, recordTmp = {};
+  if (record0){
+    lastRowId = record0.orb_scenarioid.id + ' ' + record0.orb_requestpositionid.id;
+    for (recordI of filteredRecords) {
+      rowId = recordI.orb_scenarioid.id + ' ' + recordI.orb_requestpositionid.id;
+      if (rowId != lastRowId){
+        rows.push(recordTmp)
+        lastRowId = rowId;
+        recordTmp = {};
+      } else {
+        recordTmp = { ...recordI };
+
+        // year
+        recordTmp[recordI.orb_year] = recordI.orb_quantity;
+      }
+    }
+    rows.push(recordTmp);
+  }
+
+  function startEditing(row) {
+    debugger;
+    setEditingId(row.orb_scenarioid + row.orb_requestpositionid)
+    /*setDrafts(function(current) {
+        debugger;
+        return { ...current, [rowId]: { ...row } }
+    })*/
+  }
+
+  function getRPSIds(scenarioId, rpId){
+    if (rpId){
+      filteredRecords.filter(rps => 
+        rps.orb_scenarioid.id == scenarioId && rps.orb_requestpositionid.id == rpId
+      )
+    } else {
+      filteredRecords.filter(rps => 
+        rps.orb_scenarioid.id == scenarioId
+      )
+    }
+  }
+
+  function updateDraft(scenarioId, requestPositionId, key, value) {
+    debugger;
+    // Make a working copy of the drafts before updating
+    let draftsNew = { ...drafts }
+
+    const rpss2Update = getRPSIds(scenarioId, requestPositionId );
+    for (let rps of rpss2Update) {
+      if(!draftsNew[rps.orb_requestpositionscenarioid]){
+        draftsNew[rps.orb_requestpositionscenarioid] = {};
+      }
+      draftsNew[rps.orb_requestpositionscenarioid][key] = value;
+    }
+    setDrafts(draftsNew);
+  }
+
+  function displayValue(row, column) {
+
+    if (!column.key){
+      return " "
+    }
+
+    const columnKey = column.key;
+
+    // Year
+    if (columnKey.slice(0,2) == '20'){
+      return row['orb_quantity'];
+    }
+
+    // Incoterm code
+    if (columnKey == 'tkct_incotermcode'){
+        return incotermCodes[row.tkct_incotermcode];
+    }
+
+    const value = row[columnKey];
+    if (typeof value == 'boolean'){
+      return (
+        <label className="toggle-control">
+          <input type="checkbox" checked={value} onChange={(event) => updateDraft(row.orb_scenarioid.id, null, event.target.checked)} />
+          <span className="toggle-track" aria-hidden="true"><span /></span>
+        </label>
+      )
+    } 
+
+    if (column.display) return value?.[column.display] ?? '—'
+    return value ?? '—'
+  }
+
+  function finishEditing() {
+    setEditingId(null)
+  }
+
+  function saveDrafts(event) {
+    debugger;
+    // Implement the logic to save drafts here
+  }
+
+  return (
+    <main className="app-shell">
+
+      <section className="workspace" aria-label="Scenario data">
+        <div className="toolbar">
+          <label className="search-field">
+            <span aria-hidden="true">⌕</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search positions, entities, years..." />
+          </label>
+          <label className="toggle-control">
+            <input type="checkbox" checked={onlyMostLikely} onChange={(event) => setOnlyMostLikely(event.target.checked)} />
+            <span className="toggle-track" aria-hidden="true"><span /></span>
+            <span>Most likely only</span>
+          </label>
+          <button className="save-button" onClick={(event) => saveDrafts(event)} >Save</button>
+          <span className="result-count">{filteredRecords.length} of {rows.length} rows</span>
+        </div>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {columns.map((column) => <th key={column.key}>{column.label}</th>)}
+                <th><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const id = row.orb_scenarioid.id + " " + row.orb_requestpositionid.id
+                const isEditing = editingId === id
+                const draft = drafts[id] ?? row
+                return (
+                  <tr key={id} className={isEditing ? 'is-editing' : ''}>
+                    {columns.map((column) => (
+                      <td key={column.key}>
+                        {/*isEditing && 
+                          columns
+                            .filter((column) => column.isEditable)
+                            .includes(column.key) ? (
+                              <input className="cell-input" type={column.type} value={row[column.key]} onChange={(event) => updateDraft(row.orb_scenarioid.id, row.orb_requestpositionid.id, column.key, event.target.value)} />
+                            ) :*/ displayValue(row, column)}
+                      </td>
+                    ))}
+                    <td className="action-cell">
+                      {isEditing ? <button className="save-button" onClick={finishEditing}>Done</button> : <button className="edit-button" onClick={() => startEditing(row)} >Edit</button>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {rows.length === 0 && <div className="empty-state"><strong>No matching positions</strong><span>Try a different search or clear the filter.</span></div>}
+        </div>
+        <p className="table-note"><span>↳</span> Changes are held in this draft workspace until submitted.</p>
+      </section>
+    </main>
+  )
+}
+
+export default App
