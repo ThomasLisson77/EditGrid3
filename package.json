@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -14,5 +15,10 @@
     "react": "latest",
     "react-dom": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
 }
