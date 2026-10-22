@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import recordsInitial from '../data.json'
+import { GroupingRowNode } from './GroupingRowNode'
+import { DataRowNode } from './DataRowNode'
 
-type Column = {
+export type Column = {
   key: string
   label: string
   type?: 'text' | 'select' | 'checkbox' | 'date' | 'number'
@@ -23,7 +25,7 @@ type RecordMetadata = {
   etag: string
 }
 
-type ScenarioRecord = {
+export type DataRow = {
   '@meta': RecordMetadata
   orb_scenarioid: EntityReference
   orb_requestpositionid: EntityReference
@@ -31,16 +33,25 @@ type ScenarioRecord = {
   orb_year: string
   orb_quantity: number | undefined
   [key: string]: unknown
+};
+
+type GroupingRow = {
+  key: string,
+  groupingInfo: string
 }
 
-type ScenarioRow = Partial<ScenarioRecord> & {
-  isGroupingLine?: boolean
-  [key: string]: unknown
+type GridRow = DataRow | GroupingRow;
+
+const dataRowEmpty: DataRow = {
+  '@meta': { logicalName: '', primaryIdAttribute: '', formattedValues: {}, etag: ''},
+  orb_scenarioid: { id: '', logicalName: '', entityType: '', name: '' },
+  orb_requestpositionid: { id: '', logicalName: '', entityType: '', name: '' },
+  orb_requestpositionscenarioid: '',
+  orb_year: new Date().getFullYear().toString(),
+  orb_quantity: 0,
 }
 
 const baseColumns: Column[] = [
-  { key: 'orb_scenarioid', label: 'Scenario No', display: 'name' },
-  { key: 'S.tkct_scenariono', label: 'Scenario Name', type: 'text' },
   { key: 'orb_requestpositionid', label: 'Position No', display: 'name' },
   { key: 'RP.orb_name', label: 'Position Name', type: 'text' },
   { key: 'tkct_incotermcode', label: 'Incoterm Code', type: 'select'},
@@ -75,7 +86,7 @@ const drafts: Record<string, Record<string, unknown>> = {}
 
 function App() {
   const [, setRefreshingTimeStamp] = useState<Date | null>(null)
-  const [records, setRecords] = useState<ScenarioRecord[]>(recordsInitial)
+  const [records, setRecords] = useState<DataRow[]>(recordsInitial)
 
   const yearColumns: Column[] = [...new Set(records.map((record) => record.orb_year))]
     .sort()
@@ -86,38 +97,66 @@ function App() {
     baseColumns[baseColumns.length - 1],
   ]
 
-  function setRowFields(recordOld: ScenarioRow, recordNew: ScenarioRecord) {
-    recordOld['@meta'] = recordNew['@meta']
-    for (const column of columns) {
-      const newValue = recordNew[column.key]
-      if (typeof newValue !== 'undefined' && !recordOld[column.key]) {
-        recordOld[column.key] = newValue
+  function setRowFields(recordOld: DataRow, recordNew: DataRow) {
+    for (const column in recordNew) {
+      const newValue = recordNew[column]
+      if (typeof newValue !== 'undefined') {
+        recordOld[column] = newValue;
       }
     }
   }
 
-  function convertRecordsToRows(): ScenarioRow[] {
-    const rows: ScenarioRow[] = [{ isGroupingLine: true }]
+  function getGroupingRow(record: DataRow): GroupingRow {
+    return {
+      key: record.orb_scenarioid.id,
+      groupingInfo: 
+        record.orb_scenarioid.name + " " + 
+        record["S.tkct_scenariono"] + 
+        " (" + 
+        new Set(records
+          .filter(
+            r => r.orb_scenarioid.id === record.orb_scenarioid.id
+          )
+          .map(r => r.orb_requestpositionid.id)
+          ).size + 
+        ")"
+    }
+  }
+
+  function convertRecordsToRows(): GridRow[] {
+    const rows: GridRow[] = []
+
     if (!records.length) {
-      setRecords(recordsInitial)
+      return rows
     }
-    const record0 = records[0]
-    let lastRowId: string | null = null
-    let recordTmp: ScenarioRow = {}
-    if (record0){
-      lastRowId = `${record0.orb_scenarioid.id} ${record0.orb_requestpositionid.id}`
-      for (const record of records) {
-        const rowId = `${record.orb_scenarioid.id} ${record.orb_requestpositionid.id}`
-        if (rowId !== lastRowId) {
-          rows.push(recordTmp)
-          lastRowId = rowId
-          recordTmp = {}
-        }
-        recordTmp[record.orb_year] = record.orb_quantity
-        setRowFields(recordTmp, record)
+    const record0 = records[0];
+
+    let groupingRow : GroupingRow = getGroupingRow(record0)
+    rows.push(groupingRow)
+
+    let lastGroupingRowId: string = record0.orb_scenarioid.id;
+    let lastDataRowId: string = `${record0.orb_scenarioid.id} ${record0.orb_requestpositionid.id}`;
+    let rowTmp: DataRow = { ...dataRowEmpty };
+    for (const record of records) {
+
+      const rowId = `${record.orb_scenarioid.id} ${record.orb_requestpositionid.id}`
+      if (rowId !== lastDataRowId) {
+        rows.push(rowTmp);
+        lastDataRowId = rowId;
+        rowTmp = { ...dataRowEmpty, orb_scenarioid: record.orb_scenarioid, orb_requestpositionid: record.orb_requestpositionid };
       }
-      rows.push(recordTmp)
+
+      if (record.orb_scenarioid.id !== lastGroupingRowId) {
+        lastGroupingRowId = record.orb_scenarioid.id;
+        groupingRow = getGroupingRow(record);
+        rows.push(groupingRow);
+      }
+
+      rowTmp[record.orb_year] = record.orb_quantity;
+      setRowFields(rowTmp, record);
     }
+    rows.push(rowTmp);
+
     return rows
   }
   const rows = convertRecordsToRows()
@@ -160,13 +199,14 @@ function App() {
     }
   }
 
-  function displayValue(row: ScenarioRow, column: Column): ReactNode {
+  function displayValue(row: DataRow, column: Column): ReactNode {
     const columnKey = column.key
-    const value = row[columnKey]
 
     if (!columnKey) {
       return ' '
     }
+
+    const value = row[columnKey]
 
     if (columnKey === 'tkct_incotermcode') {
         return (
@@ -263,19 +303,26 @@ function App() {
             </thead>
             <tbody>
               {rows.map((row) => {
-                const id = row.isGroupingLine
-                  ? 'grouping-line'
-                  : `${row.orb_scenarioid?.id ?? ''} ${row.orb_requestpositionid?.id ?? ''}`
-                return (
-                  <tr key={id}>
-                    {columns.map((column) => (
-                      <td key={column.key}>
-                        {displayValue(row, column)}
-                      </td>
-                    ))}
-                  </tr>
-                )
-              })}
+
+                // Determine, if the row is of type GroupingRow or DataRow
+                if ('@meta' in row) {
+                  return (
+                    <DataRowNode 
+                      key={`${row.orb_scenarioid?.id ?? ''} ${row.orb_requestpositionid?.id ?? ''}`}
+                      columns={columns}
+                      row={row}
+                      displayValue={displayValue}
+                  />)
+                } else {
+                  return (
+                    <GroupingRowNode 
+                      key={row.key}
+                      groupingInfo={row.groupingInfo}
+                      numberOfColumns={columns.length}
+                    /> 
+                  )
+                }
+              })}            
             </tbody>
           </table>
           {rows.length === 0 && <div className="empty-state"><strong>No matching positions</strong><span>Try a different search or clear the filter.</span></div>}

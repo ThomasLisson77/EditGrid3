@@ -35,7 +35,7 @@ h2 em { color: #b56a37; font-style: normal; }
 .result-count { margin-left: auto; color: #9aa39d; font: 11px 'DM Mono', monospace; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; min-width: 900px; border-collapse: collapse; text-align: left; }
-th { padding: 15px 20px; background: #f9faf8; color: #8b958e; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+th { padding: 15px 20px; background: #141a93; color: #fff; font: 10px 'DM Mono', monospace; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 td { padding: 20px; border-top: 1px solid #edf0ed; color: #526059; font-size: 12px; white-space: nowrap; }
 tr { transition: background .2s; }
 tbody tr:hover, tr.is-editing { background: #fcfdf9; }
@@ -50,4 +50,6 @@ tbody tr:hover, tr.is-editing { background: #fcfdf9; }
 .table-note { margin: 0; padding: 15px 20px; color: #9aa39d; font: 11px 'DM Mono', monospace; }
 .table-note span { margin-right: 8px; color: #b56a37; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.grouping-row td { font-weight: bold; }
+.grouping-row { background: #d8d8e2; }
 @media (max-width: 680px) { .app-shell { padding: 20px 18px 48px; } .intro { display: block; padding: 48px 0 34px; } .summary-panel { margin-top: 34px; } .toolbar { flex-wrap: wrap; gap: 14px; } .result-count { width: 100%; margin: 0; } }
